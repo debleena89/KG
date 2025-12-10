@@ -59,7 +59,7 @@ def main():
     with open(args.output, "w") as f:
         json.dump(dataset, f, indent=2)
 
-    print(f"Dataset created with {len(dataset)} entries → {args.output}")
+    print(f"Dataset created with {len(dataset)} entries -> {args.output}")
 
 
 if __name__ == "__main__":

@@ -77,13 +77,6 @@ def extract_entities(module_name, input_ports, output_ports, signals, parameters
                     'target': f"param_{urllib.parse.quote(param_name)}",
                     'type': 'uses_parameter'
                 })
-    for m in modules:
-        print("Module Name:", m["name"])
-        print("Input Ports:", m["input_ports"])
-        print("Output Ports:", m["output_ports"])
-        print("Signals:", m["signals"])
-        print("Parameters:", m["parameters"])
-        print("Operations:", m["operations"])
     return modules, signal_dict, param_dict, operation_dict, relationships
 
 def create_knowledge_graph(modules, signals, parameters, operations, relationships, output_file):

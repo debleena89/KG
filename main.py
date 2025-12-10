@@ -78,13 +78,16 @@ class LLMClient:
             )
             return response.content[0].text.strip()
 
-def process_file(input_path, output_path, llm_client):
+def process_file(input_path, output_path, kf, files, include_folder, llm_client):
     with open(input_path, "r") as f:
         rows = json.load(f)
 
     output_rows = []
 
     for idx, row in enumerate(rows):
+        if not any(s in row["text"] for s in files):
+            continue
+        print(f" Working on {row["text"]}")
         code = row["code"]
 
         # LLM Summary
@@ -100,7 +103,7 @@ def process_file(input_path, output_path, llm_client):
 
         # Parsing & Knowledge Graph
         module_name, input_ports, output_ports, signals, parameters, operations, ast = \
-            parse_code.parse_verilog_code(code)
+            parse_code.parse_verilog_code(code, include_folder)
 
         modules, signals_dict, param_dict, operation_dict, relationships = \
             extract.extract_entities(
@@ -108,8 +111,8 @@ def process_file(input_path, output_path, llm_client):
                 parameters, operations, ast
             )
 
-        os.makedirs(f"{output_path}/knowledge_graphs", exist_ok=True)
-        kg_file = os.path.join(output_path, "knowledge_graphs", f"kg_{idx}.ttl")
+        os.makedirs(kf, exist_ok=True)
+        kg_file = os.path.join(kf, f"kg_{idx}.ttl")
 
         extract.create_knowledge_graph(
             modules, signals_dict, param_dict, operation_dict, relationships, kg_file
@@ -145,10 +148,28 @@ def main():
         help="Path to output JSON file."
     )
 
+    parser.add_argument(
+        "--kf",
+        required=True,
+        help="Path to Knowledge Folder."
+    )
+
+    parser.add_argument(
+        "--files",
+        nargs="*",
+        help="Specific .sv/.v files to include (optional)."
+    )
+
+    parser.add_argument(
+        "--include_folder",
+        nargs="*",
+        help="Specific folder containing sv/v files"
+    )
+
     args = parser.parse_args()
 
     llm_client = LLMClient(args.client)
-    process_file(args.input, args.output, llm_client)
+    process_file(args.input, args.output, args.kf, args.files, args.include_folder, llm_client)
 
 
 if __name__ == "__main__":
