@@ -1,4 +1,4 @@
-import regex as re
+import re
 from contextlib import redirect_stderr
 import os
 import io
@@ -49,7 +49,7 @@ def classify_operation(expr):
         operands = re.findall(r'\b[\w\[\]:]+\b', expr)
     return op_type, operands
 
-def parse_verilog_code(code, temp_file='temp.v'):
+def parse_verilog_code(code, include_folder, temp_file='temp.v'):
     module_name = None
     input_ports = []
     output_ports = []
@@ -61,14 +61,13 @@ def parse_verilog_code(code, temp_file='temp.v'):
     port_directions = {}
 
     code = preprocess_verilog(code)
-    print("fiunction called")
     with open(temp_file, 'w') as f:
         f.write(code)
 
     try:
         f = io.StringIO()
         with redirect_stderr(f):
-            ast, _ = parse([temp_file], preprocess_include=['/content/verilog/'], debug=False)
+            ast, _ = parse([temp_file], preprocess_include=include_folder, debug=False)
         if isinstance(ast.description, Description):
             for node in ast.description.definitions:
                 if isinstance(node, ModuleDef):
