@@ -11,7 +11,6 @@ def extract_entities(module_name, input_ports, output_ports, signals, parameters
         'parameters': [{'name': name, 'value': value} for name, value in parameters],
         'operations': operations
     }]
-    print("in the extract file")
     
 
     signal_dict = {}
@@ -91,7 +90,6 @@ def create_knowledge_graph(modules, signals, parameters, operations, relationshi
     g = Graph()
     EX = Namespace('http://example.org/hw#')
     g.bind('ex', EX)
-    print("here in create graph fiel")
     g.add((EX.Module, RDF.type, RDFS.Class))
     g.add((EX.Signal, RDF.type, RDFS.Class))
     g.add((EX.Parameter, RDF.type, RDFS.Class))

@@ -7,6 +7,7 @@ import extract
 import openai
 from google.genai import Client
 import anthropic
+from google.genai.types import HttpOptions
 load_dotenv()
 
 class LLMClient:
@@ -22,10 +23,9 @@ class LLMClient:
         elif self.provider == "google-genai":
             project = os.getenv("GOOGLE_CLOUD_PROJECT")
             location = os.getenv("GOOGLE_CLOUD_LOCATION")
-            credentials=os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-            if not api_key:
+            if not project:
                 raise ValueError("GOOGLE_API_KEY missing in .env")
-            self.client = Client(vertexai=True, project=project, location=location, credentials=credentials)
+            self.client = Client(vertexai=True, project=project, location=location, http_options=HttpOptions(api_version="v1"))
 
         elif self.provider == "anthropic":
             api_key = os.getenv("ANTHROPIC_API_KEY")
@@ -108,8 +108,8 @@ def process_file(input_path, output_path, llm_client):
                 parameters, operations, ast
             )
 
-        os.makedirs("knowledge_graphs", exist_ok=True)
-        kg_file = os.path.join("knowledge_graphs", f"kg_{idx}.ttl")
+        os.makedirs(f"{output_path}/knowledge_graphs", exist_ok=True)
+        kg_file = os.path.join(output_path, "knowledge_graphs", f"kg_{idx}.ttl")
 
         extract.create_knowledge_graph(
             modules, signals_dict, param_dict, operation_dict, relationships, kg_file

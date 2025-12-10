@@ -1,7 +1,13 @@
 import os
 import json
 import argparse
+import re
 
+def remove_sv_comments(code: str) -> str:
+    code = re.sub(r"/\*.*?\*/", "", code, flags=re.DOTALL)
+    code = re.sub(r"//.*?$", "", code, flags=re.MULTILINE)
+
+    return code.strip()
 
 def load_sv_files(folder_path):
     dataset = []
@@ -15,17 +21,19 @@ def load_sv_files(folder_path):
         file_path = os.path.join(folder_path, filename)
 
         with open(file_path, "r") as f:
-            code = f.read()
+            raw_code = f.read()
+
+        # Remove comments
+        cleaned_code = remove_sv_comments(raw_code)
 
         text_description = f"SystemVerilog module from file: {filename}"
 
         dataset.append({
             "text": text_description,
-            "code": code
+            "code": cleaned_code
         })
 
     return dataset
-
 
 def main():
     parser = argparse.ArgumentParser(

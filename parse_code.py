@@ -61,7 +61,6 @@ def parse_verilog_code(code, temp_file='temp.v'):
     port_directions = {}
 
     code = preprocess_verilog(code)
-    print("fiunction called")
     with open(temp_file, 'w') as f:
         f.write(code)
 

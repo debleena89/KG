@@ -7,3 +7,5 @@ build/
 dist/
 wheels/
 *.egg-info
+
+parseteb.py
