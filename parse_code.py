@@ -1,4 +1,4 @@
-import regex as re
+import re
 from contextlib import redirect_stderr
 import os
 import io
@@ -68,7 +68,7 @@ def parse_verilog_code(code, temp_file='temp.v'):
     try:
         f = io.StringIO()
         with redirect_stderr(f):
-            ast, _ = parse([temp_file], preprocess_include=['/content/verilog/'], debug=False)
+            ast, _ = parse([temp_file], preprocess_include=['./verilog/'], debug=False)
         if isinstance(ast.description, Description):
             for node in ast.description.definitions:
                 if isinstance(node, ModuleDef):
