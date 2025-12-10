@@ -5,13 +5,13 @@ set -e  # Exit on error
 SV_FOLDER="../DATASET/RTL/i2c"
 
 # Where the intermediate JSON dataset will be saved
-DATASET_JSON="../RESPONSE/i2c.json"
+DATASET_JSON="../i2c/i2c.json"
 
 # Final output after LLM summarization
-OUTPUT_JSON="../RESPONSE/i2c_op.json"
+OUTPUT_JSON="../i2c/i2c_op.json"
 
 # Final TTL after LLM summarization
-KNOWLEDGE_FOLDER="../RESPONSE/knowledge_graph"
+KNOWLEDGE_FOLDER="../i2c/knowledge_graph"
 
 # LLM provider: openai | google-genai | anthropic
 LLM_PROVIDER="google-genai"
