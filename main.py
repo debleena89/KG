@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 import parse_code
 import extract
+import chromadb
 import openai
 from google.genai import Client
 import anthropic
@@ -59,7 +60,7 @@ class LLMClient:
             response = self.client.chat.completions.create(
                 model="gpt-5",
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=1000
+                #max_tokens=1000
             )
             return response.choices[0].message.content.strip()
 
@@ -77,12 +78,65 @@ class LLMClient:
                 messages=[{"role": "user", "content": prompt}]
             )
             return response.content[0].text.strip()
+        
+def store_in_chroma(chunks, embeddings, chroma_path, collection_name='verilog_modules'):
+    client_ch = chromadb.PersistentClient(path=chroma_path)
+    try:
+        client_ch.delete_collection(collection_name)
+    except:
+        pass
+    collection = client_ch.create_collection(collection_name)
+
+    valid_chunks = []
+    valid_embeddings = []
+    for chunk, emb in zip(chunks, embeddings):
+        if not all(x == 0 for x in emb):
+            valid_chunks.append(chunk)
+            valid_embeddings.append(emb)
+
+    if valid_chunks:
+        collection.add(
+            embeddings=[emb for emb in valid_embeddings],
+            documents=[f"Instruction: {chunk['text']}\nCode:\n{chunk['original_code']}\nSummary:\n{chunk['summary']}" for chunk in valid_chunks],
+            metadatas=[{
+                'id': chunk['id'],
+                'instruction': chunk['text'],
+                'summary': chunk['summary'],
+                #'knowledge_graph': chunk['knowledge_graph'],
+                #'module_name': chunk.get('module_name', '')
+            } for chunk in valid_chunks],
+            ids=[chunk['id'] for chunk in valid_chunks]
+        )
+    return collection
+
+def get_code_embedding(code):
+    try:
+        response = openai.embeddings.create(
+            input=code,
+            model='text-embedding-3-small'
+        )
+        return response.data[0].embedding
+    except Exception as e:
+        logging.error(f'Error generating embedding: {str(e)}')
+        return None
+
+def generate_code_embeddings(code_chunks):
+    embeddings = []
+    for chunk in code_chunks:
+        text = f"Instruction: {chunk['text']}\nCode:\n{chunk['original_code']}\nSummary:\n{chunk['summary']}"
+        embedding = get_code_embedding(text)
+        if embedding:
+            embeddings.append(embedding)
+        else:
+            embeddings.append([0] * 1536)
+            print(f"Failed to generate embedding for chunk {chunk['id']}")
+    return embeddings
 
 def process_file(input_path, output_path, kf, files, include_folder, llm_client):
     with open(input_path, "r") as f:
         rows = json.load(f)
 
-    output_rows = []
+    chunks = []
 
     for idx, row in enumerate(rows):
         if not any(s in row["text"] for s in files):
@@ -93,8 +147,8 @@ def process_file(input_path, output_path, kf, files, include_folder, llm_client)
         # LLM Summary
         summary = llm_client.summarize(code)
 
-        output_rows.append({
-            "row_number": idx,
+        chunks.append({
+            "id": str(idx),
             "text": row["text"],
             "code_line_count": len(code),
             "original_code": code,
@@ -119,7 +173,13 @@ def process_file(input_path, output_path, kf, files, include_folder, llm_client)
         )
 
     with open(output_path, "w") as f:
-        json.dump(output_rows, f, indent=2)
+        json.dump(chunks, f, indent=2)
+
+    embeddings = generate_code_embeddings(chunks)
+    print(f'Generated embeddings for {len(embeddings)} chunks')
+    chroma_path = './verilog_chroma_db'
+    collection = store_in_chroma(chunks, embeddings, chroma_path)
+    print(f'Chroma DB saved to {chroma_path}')
 
     print(f"Processing completed. Output saved to {output_path}")
 
