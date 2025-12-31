@@ -1,6 +1,6 @@
 import argparse
 import json
-import os
+import os, uuid
 from dotenv import load_dotenv
 import parse_code
 import extract
@@ -79,9 +79,7 @@ class LLMClient:
             )
             return response.content[0].text.strip()
 
-def process_file(input_path, output_path, kf, files, include_folder, llm_client, CHROMA_PERSIST_DIRECTORY):
-    chroma_path = os.path.join(CHROMA_PERSIST_DIRECTORY, 'verilog_chroma_db')
-    metadata_file = os.path.join(CHROMA_PERSIST_DIRECTORY, 'chunk_metadata.json')
+def process_file(input_path, output_path, kf, files, include_folder, llm_client: LLMClient, CHROMA_PERSIST_DIRECTORY):
     metadata = []
     with open(input_path, "r") as f:
         rows = json.load(f)
@@ -117,11 +115,11 @@ def process_file(input_path, output_path, kf, files, include_folder, llm_client,
             )
         chunk['module_name'] = module_name
         chunk['summary'] = summary
-        chunk['knowledge_graph'] = kg_file
 
 
         os.makedirs(kf, exist_ok=True)
         kg_file = os.path.join(kf, f"kg_{idx}.ttl")
+        chunk['knowledge_graph'] = kg_file
 
         extract.create_knowledge_graph(
             modules, 
@@ -133,12 +131,13 @@ def process_file(input_path, output_path, kf, files, include_folder, llm_client,
         )
 
         metadata.append({
+                'id': uuid.uuid4().hex,
                 'row_index':idx,
                 'module_name': module_name,
                 'knowledge_graph': kg_file,
-                'instruction': chunk['instruction'],
+                'instruction': f'Verilog module code and summary for {module_name}',
                 'summary': chunk['summary'],
-                'code': chunk['code'],
+                'code': row['code'],
                 'text': row['text']
             })
 
@@ -147,11 +146,16 @@ def process_file(input_path, output_path, kf, files, include_folder, llm_client,
 
     print(f"Processing completed. Output saved to {output_path}")
     
+    os.makedirs(CHROMA_PERSIST_DIRECTORY, exist_ok=True)
+    chroma_path = os.path.join(CHROMA_PERSIST_DIRECTORY, 'verilog_chroma_db')
+    metadata_file = os.path.join(CHROMA_PERSIST_DIRECTORY, 'chunk_metadata.json')
+    os.makedirs(chroma_path, exist_ok=True)
+    
     with open(metadata_file, 'w') as f:
         json.dump(metadata, f, indent=2)
     print(f'Metadata saved to {metadata_file}')
 
-    embeddings = generate_code_embeddings(metadata, llm_client)
+    embeddings = generate_code_embeddings(metadata, llm_client.provider)
     print(f'Generated embeddings for {len(embeddings)} chunks')
 
     store_in_chroma(metadata, embeddings, chroma_path)

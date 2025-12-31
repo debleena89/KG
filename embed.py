@@ -1,4 +1,4 @@
-import uuid, logging
+import logging
 import chromadb
 import os
 
@@ -7,8 +7,6 @@ def get_code_embedding(code: str, provider: str):
     Generate an embedding for `code` using a specified provider.
     `provider` should be one of: "openai", "google", "anthropic"
     """
-    provider = provider.lower()
-
     try:
         if provider == "openai":
             import openai
@@ -33,7 +31,7 @@ def get_code_embedding(code: str, provider: str):
                 contents = code,
                 config = EmbedContentConfig(output_dimensionality=1536)
             )
-            return embedding_resp.embeddings[0]
+            return embedding_resp.embeddings[0].values
 
         elif provider == "anthropic":
             logging.error("Anthropic does not provide embeddings natively. Please choose a different provider.")
@@ -51,9 +49,9 @@ def generate_code_embeddings(code_chunks, provider):
     embeddings = []
     for chunk in code_chunks:
         text = f"Instruction: {chunk['instruction']}\nCode:\n{chunk['code']}\nSummary:\n{chunk['summary']}"
-        embedding = get_code_embedding(text)
+        embedding = get_code_embedding(text, provider)
         if embedding:
-            embeddings.append(embedding, provider)
+            embeddings.append(embedding)
         else:
             embeddings.append([0] * 1536)
             print(f"Failed to generate embedding for chunk {chunk['id']}")
@@ -79,7 +77,7 @@ def store_in_chroma(chunks, embeddings, chroma_path, collection_name='verilog_mo
             embeddings=[emb for emb in valid_embeddings],
             documents=[f"Instruction: {chunk['instruction']}\nCode:\n{chunk['code']}\nSummary:\n{chunk['summary']}" for chunk in valid_chunks],
             metadatas=[{
-                'id': uuid.uuid4().hex,
+                'id': chunk['id'],
                 'instruction': chunk['instruction'],
                 'text': chunk['text'],
                 'summary': chunk['summary'],
