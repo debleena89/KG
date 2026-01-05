@@ -5,14 +5,14 @@ set -e  # Exit on error
 SV_FOLDER="../DATASET/RTL/i2c"
 
 # Where the intermediate JSON dataset will be saved
-DATASET_JSON="../i2c/i2c.json"
+DATASET_JSON="../i2c_deep/i2c.json"
 
 # Final output after LLM summarization
-OUTPUT_JSON="../i2c/i2c_op.json"
+OUTPUT_JSON="../i2c_deep/i2c_op.json"
 
 # Final TTL after LLM summarization
-KNOWLEDGE_FOLDER="../i2c/knowledge_graph"
-
+KNOWLEDGE_FOLDER="../i2c_deep/knowledge_graph"
+CHROMA_PERSIST_DIRECTORY="../i2c_deep/chromadb"
 # LLM provider: openai | google-genai | anthropic
 LLM_PROVIDER="google-genai"
 
@@ -36,7 +36,8 @@ python3 "$LLM_SCRIPT" \
     --output "$OUTPUT_JSON" \
     --files i2c_master_top.sv i2c_master_bit_ctrl.sv i2c_master_byte_ctrl.sv \
     --include_folder "$SV_FOLDER" \
-    --kf "$KNOWLEDGE_FOLDER"
+    --kf "$KNOWLEDGE_FOLDER" \
+    --chroma_dir "$CHROMA_PERSIST_DIRECTORY"
 
 echo "All done!"
 echo "Output written to: $OUTPUT_JSON"

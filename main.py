@@ -1,11 +1,12 @@
 import argparse
 import json
-import os
+import os, uuid
 from dotenv import load_dotenv
 import parse_code
 import extract
 import chromadb
 import openai
+from embed import generate_code_embeddings, store_in_chroma
 from google.genai import Client
 import anthropic
 from google.genai.types import HttpOptions
@@ -66,7 +67,7 @@ class LLMClient:
 
         elif self.provider == "google-genai":
             response = self.client.models.generate_content(
-                model="gemini-2.5-pro",
+                model="gemini-3-pro-preview",
                 contents=prompt
             )
             return response.text.strip()
@@ -132,13 +133,15 @@ def generate_code_embeddings(code_chunks):
             print(f"Failed to generate embedding for chunk {chunk['id']}")
     return embeddings
 
-def process_file(input_path, output_path, kf, files, include_folder, llm_client):
+def process_file(input_path, output_path, kf, files, include_folder, llm_client: LLMClient, CHROMA_PERSIST_DIRECTORY):
+    metadata = []
     with open(input_path, "r") as f:
         rows = json.load(f)
 
     chunks = []
 
     for idx, row in enumerate(rows):
+        chunk = {}
         if not any(s in row["text"] for s in files):
             continue
         print(f" Working on {row["text"]}")
@@ -151,7 +154,7 @@ def process_file(input_path, output_path, kf, files, include_folder, llm_client)
             "id": str(idx),
             "text": row["text"],
             "code_line_count": len(code),
-            "original_code": code,
+            "code": code,
             "summary": summary
         })
 
@@ -164,13 +167,33 @@ def process_file(input_path, output_path, kf, files, include_folder, llm_client)
                 module_name, input_ports, output_ports, signals,
                 parameters, operations, ast
             )
+        chunk['module_name'] = module_name
+        chunk['summary'] = summary
+
 
         os.makedirs(kf, exist_ok=True)
         kg_file = os.path.join(kf, f"kg_{idx}.ttl")
+        chunk['knowledge_graph'] = kg_file
 
         extract.create_knowledge_graph(
-            modules, signals_dict, param_dict, operation_dict, relationships, kg_file
+            modules, 
+            signals_dict, 
+            param_dict, 
+            operation_dict, 
+            relationships, 
+            kg_file
         )
+
+        metadata.append({
+                'id': uuid.uuid4().hex,
+                'row_index':idx,
+                'module_name': module_name,
+                'knowledge_graph': kg_file,
+                'instruction': f'Verilog module code and summary for {module_name}',
+                'summary': chunk['summary'],
+                'code': row['code'],
+                'text': row['text']
+            })
 
     with open(output_path, "w") as f:
         json.dump(chunks, f, indent=2)
@@ -182,6 +205,20 @@ def process_file(input_path, output_path, kf, files, include_folder, llm_client)
     print(f'Chroma DB saved to {chroma_path}')
 
     print(f"Processing completed. Output saved to {output_path}")
+    
+    os.makedirs(CHROMA_PERSIST_DIRECTORY, exist_ok=True)
+    chroma_path = os.path.join(CHROMA_PERSIST_DIRECTORY, 'verilog_chroma_db')
+    metadata_file = os.path.join(CHROMA_PERSIST_DIRECTORY, 'chunk_metadata.json')
+    os.makedirs(chroma_path, exist_ok=True)
+    
+    with open(metadata_file, 'w') as f:
+        json.dump(metadata, f, indent=2)
+    print(f'Metadata saved to {metadata_file}')
+
+    embeddings = generate_code_embeddings(metadata, llm_client.provider)
+    print(f'Generated embeddings for {len(embeddings)} chunks')
+
+    store_in_chroma(metadata, embeddings, chroma_path)
 
 
 def main():
@@ -226,10 +263,16 @@ def main():
         help="Specific folder containing sv/v files"
     )
 
+    parser.add_argument(
+        "--chroma_dir",
+        dest='CHROMA_PERSIST_DIRECTORY',
+        help="Path to save chromadb files"
+    )
+
     args = parser.parse_args()
 
     llm_client = LLMClient(args.client)
-    process_file(args.input, args.output, args.kf, args.files, args.include_folder, llm_client)
+    process_file(args.input, args.output, args.kf, args.files, args.include_folder, llm_client, args.CHROMA_PERSIST_DIRECTORY)
 
 
 if __name__ == "__main__":
